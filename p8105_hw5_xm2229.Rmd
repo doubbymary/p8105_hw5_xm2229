@@ -52,3 +52,59 @@ iris_with_missing %>%
 
 
 ## Problem 2
+
+
+Create a tidy dataframe containing data from all participants, including the subject ID, arm, and observations over time:
+
+ * Start with a dataframe containing all file names; the `list.files` function will help
+ * Iterate over file names and read in data for each subject using `purrr::map` and saving the result as a new variable in the dataframe
+ * Tidy the result; manipulate file names to include control arm and subject ID, make sure weekly observations are “tidy”, and do any other tidying that’s necessary
+
+
+```{r, message=FALSE}
+path_to_dir = "./data"
+
+## a helper function for 
+## 1. concatenating path to file
+## 2. read the file as dataframe
+## 3. append arm and subject ID
+read_files = function(x){
+  path_to_file = paste(path_to_dir, x, sep = "/")
+  row = read_csv(path_to_file)
+  splited_file = unlist(strsplit(x, ".", fixed = TRUE))
+  arm_id = unlist(strsplit(splited_file[1], "_", fixed = TRUE))
+  row$arm = arm_id[1]
+  row$id = as.integer(arm_id[2])
+  return(row)
+}
+
+arm = purrr::map(list.files(path_to_dir), read_files) %>%
+  bind_rows() %>%
+  pivot_longer(cols = starts_with("week"), 
+               names_to = "week",
+               names_prefix = "week_",
+               values_to = "data") %>%
+  mutate(week = as.integer(week),
+         arm = forcats::fct_relevel(arm, "con", "exp")) %>%
+  janitor::clean_names()
+
+```
+
+The tidyed data is called `arm`. It contains `r ncol(arm)` columns and `r nrow(arm)` observations. The columns are:
+
+ * `arm`: a factor column that contains whether if a sample is control group ( __con__ ) or experiemental group ( __exp__ )
+ * `id`: contains the id of the sample
+ * `week`: contains the number of week the observation belong, which is an integer column
+ * `data`: contains all the data measured in the longitudinal study 
+
+Below is a spaghetti plot showing observations on each subject over time. According to the plot, there is clearly a trend that the experimental group has a signifcant growth as time past and the control group stays the same. 
+
+```{r, fig.width = 12}
+arm %>% 
+  ggplot(aes(x = week, y = data, group = arm, color = arm)) +
+  geom_path() + 
+  labs(title = "Data measured on control group and experimental group by week", colour = "ARM groups") + 
+  ylab("Measured Data") + 
+  xlab("Number of Week")
+```
+
